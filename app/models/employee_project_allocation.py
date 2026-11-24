@@ -25,12 +25,16 @@ class EmployeeProjectAllocation(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "allocation_percentage BETWEEN 0 AND 100",
+            "allocation_percentage >0  AND allocation_percentage <= 100",
             name="check_allocation_percentage_range"
         ),
         CheckConstraint(
-            "start_date IS NULL OR end_date IS NULL OR end_date >= start_date",
+            "end_date >= start_date",
             name="check_allocation_date_range"
+        ),
+        CheckConstraint(
+            "status IN ('planned', 'active', 'completed', 'cancelled')",
+            name="check_allocation_status"
         ),
     )
 
@@ -57,22 +61,23 @@ class EmployeeProjectAllocation(Base):
 
     assigned_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("employees.employee_id"),
-        nullable=True
+        nullable=False
     )
 
     status: Mapped[str] = mapped_column(
         String(30),
+        nullable=False,
+        server_default = "planned"
+    )
+
+    start_date: Mapped[date] = mapped_column(
+        Date,
         nullable=False
     )
 
-    start_date: Mapped[date | None] = mapped_column(
+    end_date: Mapped[date] = mapped_column(
         Date,
-        nullable=True
-    )
-
-    end_date: Mapped[date | None] = mapped_column(
-        Date,
-        nullable=True
+        nullable=False
     )
 
     employee: Mapped["Employee"] = relationship(

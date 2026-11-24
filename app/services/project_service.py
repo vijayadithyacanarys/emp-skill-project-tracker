@@ -35,7 +35,7 @@ def update_project(
     if project is None:
         return None
 
-    for field, value in project_data.model_dump().items():
+    for field, value in project_data.model_dump(exclude_unset=True).items():
         setattr(project, field, value)
 
     db.commit()

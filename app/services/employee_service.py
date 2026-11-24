@@ -7,6 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from app.models.employee import Employee
 from app.models.role import Role
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate
+from app.models.employee_skill import EmployeeSkill
+from app.models.employee_project_allocation import EmployeeProjectAllocation
 
 
 # CREATE EMPLOYEE
@@ -33,7 +35,8 @@ def create_employee(db: Session, employee_data: EmployeeCreate):
         name=employee_data.name,
         email=employee_data.email,
         role_id=employee_data.role_id,
-        experience_years=employee_data.experience_years
+        experience_years=employee_data.experience_years,
+        status=employee_data.status
     )
 
     try:
@@ -74,27 +77,25 @@ def update_employee(
     if employee is None:
         return None
 
-    # Validate the new role
-    role = db.get(Role, employee_data.role_id)
+    updates = employee_data.model_dump(exclude_unset=True)
 
-    if role is None:
-        raise ValueError("Role does not exist")
+    if "role_id" in updates:
+        role = db.get(Role, updates["role_id"])
+        if role is None:
+            raise ValueError("Role does not exist")
 
-    # Check whether another employee uses this email
-    existing_employee = db.scalar(
-        select(Employee).where(
-            Employee.email == employee_data.email,
-            Employee.employee_id != employee_id
+    if "email" in updates:
+        existing_employee = db.scalar(
+            select(Employee).where(
+                Employee.email == updates["email"],
+                Employee.employee_id != employee_id
+            )
         )
-    )
+        if existing_employee:
+            raise ValueError("Email already registered")
 
-    if existing_employee:
-        raise ValueError("Email already registered")
-
-    employee.name = employee_data.name
-    employee.email = employee_data.email
-    employee.role_id = employee_data.role_id
-    employee.experience_years = employee_data.experience_years
+    for field, value in updates.items():
+        setattr(employee, field, value)
 
     try:
         db.commit()
@@ -115,6 +116,26 @@ def delete_employee(db: Session, employee_id: uuid.UUID):
     if employee is None:
         return False
 
+    has_skills = db.scalar(
+        select(EmployeeSkill.employee_id)
+        .where(EmployeeSkill.employee_id == employee_id)
+        .limit(1)
+    ) is not None
+    has_allocations = db.scalar(
+        select(EmployeeProjectAllocation.allocation_id)
+        .where(
+            (EmployeeProjectAllocation.employee_id == employee_id)
+            | (EmployeeProjectAllocation.assigned_by == employee_id)
+        )
+        .limit(1)
+    ) is not None
+
+    if has_skills or has_allocations:
+        employee.status = "inactive"
+        db.commit()
+        db.refresh(employee)
+        return True
+
     try:
         db.delete(employee)
         db.commit()
@@ -128,9 +149,19 @@ def delete_employee(db: Session, employee_id: uuid.UUID):
         )
 
 def bulk_insert_employees(db : Session, batch):
+    records = []
+    for record in batch:
+        record = dict(record)
+        record_status = record.get("status", "active")
+        if record_status not in ("active", "inactive"):
+            raise ValueError(
+                f"Invalid employee status: {record_status}. "
+                "Expected 'active' or 'inactive'"
+            )
+        record["status"] = record_status
+        records.append(record)
 
     stmt = insert(Employee)
-
-    db.execute(stmt, batch)
+    db.execute(stmt, records)
 
     db.commit()

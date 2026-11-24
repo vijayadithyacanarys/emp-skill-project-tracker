@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
+from uuid import UUID
 
 
 class EmployeeSkillCreate(BaseModel):
@@ -17,8 +18,9 @@ class EmployeeSkillCreate(BaseModel):
 
 
 class EmployeeSkillResponse(BaseModel):
-    employee_id: str
+    employee_id: UUID
     skill_id: int
+    skill_name: str
     proficiency_level: int
     years_of_experience: float
     verified: bool

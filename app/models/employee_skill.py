@@ -63,3 +63,7 @@ class EmployeeSkill(Base):
         "Skill",
         back_populates="employees"
     )
+
+    @property
+    def skill_name(self) -> str:
+        return self.skill.skill_name

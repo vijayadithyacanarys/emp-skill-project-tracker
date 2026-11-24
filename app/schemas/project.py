@@ -27,7 +27,27 @@ class ProjectCreate(ProjectFields):
 
 
 class ProjectUpdate(ProjectFields):
-    pass
+    project_name: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=200
+    )
+    description: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    status: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=30
+    )
+
+    @model_validator(mode="after")
+    def validate_non_nullable_fields(self):
+        if "project_name" in self.model_fields_set and self.project_name is None:
+            raise ValueError("project_name cannot be null")
+        if "status" in self.model_fields_set and self.status is None:
+            raise ValueError("status cannot be null")
+        return self
 
 
 class ProjectResponse(BaseModel):

@@ -125,11 +125,11 @@ def get_employee_by_id_endpoint(
 
 
 # UPDATE EMPLOYEE
-@router.put(
+@router.patch(
     "/{employee_id}",
     response_model=EmployeeResponse
 )
-def update_employee_endpoint(
+def patch_employee_endpoint(
     employee_id: UUID,
     employee_data: EmployeeUpdate,
     db: Session = Depends(get_db)
@@ -154,6 +154,18 @@ def update_employee_endpoint(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error)
         )
+
+
+@router.put(
+    "/{employee_id}",
+    response_model=EmployeeResponse
+)
+def update_employee_endpoint(
+    employee_id: UUID,
+    employee_data: EmployeeUpdate,
+    db: Session = Depends(get_db)
+):
+    return patch_employee_endpoint(employee_id, employee_data, db)
 
 
 # DELETE EMPLOYEE

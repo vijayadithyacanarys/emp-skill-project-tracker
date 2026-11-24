@@ -31,6 +31,10 @@ class Employee(Base):
             "experience_years >= 0",
             name="check_experience_nonnegative"
         ),
+        CheckConstraint(
+            "status IN ('active', 'inactive')",
+            name="check_employee_status"
+        ),
     )
 
     employee_id: Mapped[uuid.UUID] = mapped_column(
@@ -64,7 +68,8 @@ class Employee(Base):
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
-        default="active"
+        default="active",
+        server_default="active"
     )
     
 

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 
 from app.models.employee import Employee
@@ -48,13 +48,19 @@ def assign_skill(
         years_of_experience=skill_data.years_of_experience,
         verified=skill_data.verified
     )
+    new_assignment.skill = skill
 
     try:
         db.add(new_assignment)
         db.commit()
-        db.refresh(new_assignment)
-
-        return new_assignment
+        return db.scalar(
+            select(EmployeeSkill)
+            .where(
+                EmployeeSkill.employee_id == employee_id,
+                EmployeeSkill.skill_id == skill_data.skill_id
+            )
+            .options(joinedload(EmployeeSkill.skill))
+        )
 
     except IntegrityError:
         db.rollback()
@@ -72,6 +78,7 @@ def get_employee_skills(db: Session, employee_id: UUID):
     statement = (
         select(EmployeeSkill)
         .where(EmployeeSkill.employee_id == employee_id)
+        .options(joinedload(EmployeeSkill.skill))
         .order_by(EmployeeSkill.skill_id)
     )
 
@@ -85,9 +92,13 @@ def get_employee_skill(
     skill_id: int
 ):
 
-    return db.get(
-        EmployeeSkill,
-        (employee_id, skill_id)
+    return db.scalar(
+        select(EmployeeSkill)
+        .where(
+            EmployeeSkill.employee_id == employee_id,
+            EmployeeSkill.skill_id == skill_id
+        )
+        .options(joinedload(EmployeeSkill.skill))
     )
 
 
@@ -99,9 +110,13 @@ def update_employee_skill(
     skill_data: EmployeeSkillUpdate
 ):
 
-    assignment = db.get(
-        EmployeeSkill,
-        (employee_id, skill_id)
+    assignment = db.scalar(
+        select(EmployeeSkill)
+        .where(
+            EmployeeSkill.employee_id == employee_id,
+            EmployeeSkill.skill_id == skill_id
+        )
+        .options(joinedload(EmployeeSkill.skill))
     )
 
     if assignment is None:
@@ -113,9 +128,14 @@ def update_employee_skill(
 
     try:
         db.commit()
-        db.refresh(assignment)
-
-        return assignment
+        return db.scalar(
+            select(EmployeeSkill)
+            .where(
+                EmployeeSkill.employee_id == employee_id,
+                EmployeeSkill.skill_id == skill_id
+            )
+            .options(joinedload(EmployeeSkill.skill))
+        )
 
     except IntegrityError:
         db.rollback()
