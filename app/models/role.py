@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
+    from app.models.employee_role import EmployeeRole
+    from app.models.permission import Permission
+    from app.models.role_permission import RolePermission
 
 class Role(Base):
     __tablename__ = "roles"
@@ -23,4 +26,18 @@ class Role(Base):
 
     employees: Mapped[list["Employee"]] = relationship(
         back_populates="role"
+    )
+
+    employee_role_assignments: Mapped[list["EmployeeRole"]] = relationship(
+        back_populates="role",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="EmployeeRole.role_id",
+    )
+
+    role_permission_assignments: Mapped[list["RolePermission"]] = relationship(
+        back_populates="role",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="RolePermission.role_id",
     )

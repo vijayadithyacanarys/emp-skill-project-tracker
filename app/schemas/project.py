@@ -59,3 +59,15 @@ class ProjectResponse(BaseModel):
     status: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectManagerAssignmentCreate(BaseModel):
+    manager_id: UUID
+
+
+class ProjectManagerResponse(BaseModel):
+    employee_id: UUID
+    name: str
+    email: str
+
+    model_config = ConfigDict(from_attributes=True)

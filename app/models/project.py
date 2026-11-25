@@ -9,6 +9,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.employee_project_allocation import EmployeeProjectAllocation
+    from app.models.project_manager import ProjectManager
     from app.models.project_required_skill import ProjectRequiredSkill
 
 
@@ -60,4 +61,11 @@ class Project(Base):
 
     allocations: Mapped[list["EmployeeProjectAllocation"]] = relationship(
         back_populates="project"
+    )
+
+    project_manager_assignments: Mapped[list["ProjectManager"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="ProjectManager.project_id",
     )

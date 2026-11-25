@@ -7,7 +7,17 @@ from sqlalchemy import select
 
 from app.models.employee_project_allocation import EmployeeProjectAllocation
 from app.database import get_db
-from app.dependencies.auth import get_current_admin
+from app.dependencies.authorization import (
+    allocation_scope_filter,
+    ensure_permission,
+    get_project_in_scope,
+    require_allocation_access,
+    require_employee_access,
+    require_permission,
+    require_project_access,
+)
+from app.models.employee import Employee
+from app.models.project import Project
 
 from app.schemas.employee_project_allocation import (
     EmployeeProjectAllocationCreate,
@@ -18,9 +28,6 @@ from app.schemas.employee_project_allocation import (
 
 from app.services.employee_project_allocation_service import (
     create_allocation,
-    get_allocation_by_id,
-    get_employee_allocations,
-    get_project_allocations,
     update_allocation,
     update_allocation_status,
     cancel_allocation,
@@ -31,7 +38,6 @@ from app.services.employee_project_allocation_service import (
 router = APIRouter(
     prefix="/allocations",
     tags=["Employee Project Allocations"],
-    dependencies=[Depends(get_current_admin)]
 )
 
 
@@ -48,12 +54,19 @@ router = APIRouter(
 def create_employee_allocation(
     allocation: EmployeeProjectAllocationCreate,
     db: Session = Depends(get_db),
-    admin_id: UUID = Depends(get_current_admin)
+    current_employee: Employee = Depends(
+        require_permission("allocation:create")
+    ),
 ):
+    get_project_in_scope(
+        db,
+        current_employee,
+        allocation.project_id,
+    )
     return create_allocation(
         db=db,
         allocation=allocation,
-        admin_id=admin_id
+        assigned_by=current_employee.employee_id
     )
 
 
@@ -67,10 +80,15 @@ def create_employee_allocation(
     response_model=list[EmployeeProjectAllocationResponse]
 )
 def read_all_allocations(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(
+        require_permission("allocation:read")
+    ),
 ):
     return db.scalars(
-        select(EmployeeProjectAllocation)
+        select(EmployeeProjectAllocation).where(
+            allocation_scope_filter(db, current_employee)
+        )
     ).all()
 
 
@@ -84,13 +102,12 @@ def read_all_allocations(
     response_model=EmployeeProjectAllocationResponse
 )
 def read_allocation(
-    allocation_id: UUID,
-    db: Session = Depends(get_db)
+    _actor: Employee = Depends(require_permission("allocation:read")),
+    authorized_allocation: EmployeeProjectAllocation = Depends(
+        require_allocation_access
+    ),
 ):
-    return get_allocation_by_id(
-        db=db,
-        allocation_id=allocation_id
-    )
+    return authorized_allocation
 
 
 # --------------------------------------------------
@@ -104,12 +121,19 @@ def read_allocation(
 )
 def read_employee_allocations(
     employee_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(
+        require_permission("allocation:read")
+    ),
+    _authorized_employee: Employee = Depends(require_employee_access),
 ):
-    return get_employee_allocations(
-        db=db,
-        employee_id=employee_id
-    )
+    return db.scalars(
+        select(EmployeeProjectAllocation)
+        .where(
+            EmployeeProjectAllocation.employee_id == employee_id,
+            allocation_scope_filter(db, current_employee),
+        )
+    ).all()
 
 
 # --------------------------------------------------
@@ -123,12 +147,19 @@ def read_employee_allocations(
 )
 def read_project_allocations(
     project_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(
+        require_permission("allocation:read")
+    ),
+    _authorized_project: Project = Depends(require_project_access),
 ):
-    return get_project_allocations(
-        db=db,
-        project_id=project_id
-    )
+    return db.scalars(
+        select(EmployeeProjectAllocation)
+        .where(
+            EmployeeProjectAllocation.project_id == project_id,
+            allocation_scope_filter(db, current_employee),
+        )
+    ).all()
 
 
 # --------------------------------------------------
@@ -143,7 +174,13 @@ def read_project_allocations(
 def update_employee_allocation(
     allocation_id: UUID,
     allocation_data: EmployeeProjectAllocationUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(
+        require_permission("allocation:update")
+    ),
+    _authorized_allocation: EmployeeProjectAllocation = Depends(
+        require_allocation_access
+    ),
 ):
     return update_allocation(
         db=db,
@@ -164,8 +201,20 @@ def update_employee_allocation(
 def update_employee_allocation_status(
     allocation_id: UUID,
     status_data: EmployeeProjectAllocationStatusUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(
+        require_permission("allocation:update")
+    ),
+    _authorized_allocation: EmployeeProjectAllocation = Depends(
+        require_allocation_access
+    ),
 ):
+    if status_data.status == "cancelled":
+        ensure_permission(
+            db,
+            current_employee.employee_id,
+            "allocation:cancel",
+        )
     return update_allocation_status(
         db=db,
         allocation_id=allocation_id,
@@ -184,7 +233,13 @@ def update_employee_allocation_status(
 )
 def delete_employee_allocation(
     allocation_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(
+        require_permission("allocation:cancel")
+    ),
+    _authorized_allocation: EmployeeProjectAllocation = Depends(
+        require_allocation_access
+    ),
 ):
     return cancel_allocation(
         db=db,
@@ -203,7 +258,13 @@ def delete_employee_allocation(
 )
 def complete_employee_allocation(
     allocation_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(
+        require_permission("allocation:update")
+    ),
+    _authorized_allocation: EmployeeProjectAllocation = Depends(
+        require_allocation_access
+    ),
 ):
     return complete_allocation(
         db=db,

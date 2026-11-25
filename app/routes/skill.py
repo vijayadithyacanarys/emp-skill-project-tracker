@@ -7,6 +7,8 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.authorization import require_permission
+from app.models.employee import Employee
 from app.schemas.skill import (
     SkillCreate,
     SkillUpdate,
@@ -35,7 +37,8 @@ router = APIRouter(
 )
 def create_skill_endpoint(
     skill_data: SkillCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:create")),
 ):
     try:
         return create_skill(db, skill_data)
@@ -53,7 +56,8 @@ def create_skill_endpoint(
     response_model=list[SkillResponse]
 )
 def get_all_skills_endpoint(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:read")),
 ):
     return get_all_skills(db)
 
@@ -65,7 +69,8 @@ def get_all_skills_endpoint(
 )
 def get_skill_by_id_endpoint(
     skill_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:read")),
 ):
     skill = get_skill_by_id(db, skill_id)
 
@@ -86,7 +91,8 @@ def get_skill_by_id_endpoint(
 def update_skill_endpoint(
     skill_id: int,
     skill_data: SkillUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:update")),
 ):
     try:
         skill = update_skill(db, skill_id, skill_data)
@@ -113,7 +119,8 @@ def update_skill_endpoint(
 )
 def delete_skill_endpoint(
     skill_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:delete")),
 ):
     try:
         deleted = delete_skill(db, skill_id)

@@ -9,20 +9,33 @@ from fastapi import (
     status,
     UploadFile
 )
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.authorization import (
+    employee_has_role,
+    employee_scope_filter,
+    require_admin_permission,
+    require_employee_access,
+    require_permission,
+)
+from app.models.employee import Employee
 from app.schemas.employee import (
     EmployeeCreate,
     EmployeeUpdate,
     EmployeeResponse
 )
+from app.schemas.role import EmployeeRoleAssignmentCreate, RoleResponse
 from app.services.employee_service import (
     create_employee,
-    get_all_employees,
-    get_employee_by_id,
     update_employee,
     delete_employee
+)
+from app.services.rbac_assignment_service import (
+    assign_employee_role,
+    get_employee_roles,
+    remove_employee_role,
 )
 
 
@@ -38,7 +51,8 @@ from app.services.employee_service import bulk_insert_employees
 @router.post("/upload-employees")
 def upload_employees(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("employee:create")),
 ):
 
     total_inserted = 0
@@ -81,7 +95,8 @@ def upload_employees(
 )
 def create_employee_endpoint(
     employee_data: EmployeeCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("employee:create")),
 ):
     try:
         return create_employee(db, employee_data)
@@ -99,9 +114,16 @@ def create_employee_endpoint(
     response_model=list[EmployeeResponse]
 )
 def get_all_employees_endpoint(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(
+        require_permission("employee:read")
+    ),
 ):
-    return get_all_employees(db)
+    return db.scalars(
+        select(Employee)
+        .where(employee_scope_filter(db, current_employee))
+        .order_by(Employee.name)
+    ).all()
 
 
 # GET EMPLOYEE BY ID
@@ -110,18 +132,12 @@ def get_all_employees_endpoint(
     response_model=EmployeeResponse
 )
 def get_employee_by_id_endpoint(
-    employee_id: UUID,
-    db: Session = Depends(get_db)
+    current_employee: Employee = Depends(
+        require_permission("employee:read")
+    ),
+    authorized_employee: Employee = Depends(require_employee_access),
 ):
-    employee = get_employee_by_id(db, employee_id)
-
-    if employee is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Employee not found"
-        )
-
-    return employee
+    return authorized_employee
 
 
 # UPDATE EMPLOYEE
@@ -132,8 +148,49 @@ def get_employee_by_id_endpoint(
 def patch_employee_endpoint(
     employee_id: UUID,
     employee_data: EmployeeUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(
+        require_permission("employee:update")
+    ),
+    authorized_employee: Employee = Depends(require_employee_access),
 ):
+    return _update_employee_endpoint(
+        employee_id,
+        employee_data,
+        db,
+        current_employee,
+        authorized_employee,
+    )
+
+
+def _update_employee_endpoint(
+    employee_id: UUID,
+    employee_data: EmployeeUpdate,
+    db: Session,
+    current_employee: Employee,
+    authorized_employee: Employee,
+):
+    is_admin = employee_has_role(
+        db,
+        current_employee.employee_id,
+        "Admin",
+    )
+    if not is_admin:
+        if authorized_employee.employee_id != current_employee.employee_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Employee not found",
+            )
+
+        privileged_fields = {"role_id", "status", "experience_years"}
+        if privileged_fields.intersection(
+            employee_data.model_dump(exclude_unset=True)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot update privileged employee fields",
+            )
+
     try:
         employee = update_employee(
             db,
@@ -163,9 +220,19 @@ def patch_employee_endpoint(
 def update_employee_endpoint(
     employee_id: UUID,
     employee_data: EmployeeUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(
+        require_permission("employee:update")
+    ),
+    authorized_employee: Employee = Depends(require_employee_access),
 ):
-    return patch_employee_endpoint(employee_id, employee_data, db)
+    return _update_employee_endpoint(
+        employee_id,
+        employee_data,
+        db,
+        current_employee,
+        authorized_employee,
+    )
 
 
 # DELETE EMPLOYEE
@@ -175,7 +242,11 @@ def update_employee_endpoint(
 )
 def delete_employee_endpoint(
     employee_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _current_employee: Employee = Depends(
+        require_permission("employee:delete")
+    ),
+    _authorized_employee: Employee = Depends(require_employee_access),
 ):
     try:
         deleted = delete_employee(db, employee_id)
@@ -190,4 +261,83 @@ def delete_employee_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error)
+        )
+
+
+@router.post(
+    "/{employee_id}/roles",
+    response_model=RoleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def assign_employee_role_endpoint(
+    employee_id: UUID,
+    assignment: EmployeeRoleAssignmentCreate,
+    db: Session = Depends(get_db),
+    _admin: Employee = Depends(
+        require_admin_permission("role:assign")
+    ),
+    _authorized_employee: Employee = Depends(require_employee_access),
+):
+    try:
+        return assign_employee_role(
+            db,
+            employee_id,
+            assignment.role_id,
+        )
+    except LookupError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+
+
+@router.get(
+    "/{employee_id}/roles",
+    response_model=list[RoleResponse],
+)
+def get_employee_roles_endpoint(
+    employee_id: UUID,
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("role:read")),
+    _authorized_employee: Employee = Depends(require_employee_access),
+):
+    try:
+        return get_employee_roles(db, employee_id)
+    except LookupError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+
+@router.delete(
+    "/{employee_id}/roles/{role_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_employee_role_endpoint(
+    employee_id: UUID,
+    role_id: int,
+    db: Session = Depends(get_db),
+    _admin: Employee = Depends(
+        require_admin_permission("role:assign")
+    ),
+    _authorized_employee: Employee = Depends(require_employee_access),
+):
+    try:
+        removed = remove_employee_role(db, employee_id, role_id)
+    except LookupError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee role assignment not found",
         )

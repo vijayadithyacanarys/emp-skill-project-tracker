@@ -7,6 +7,11 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.authorization import (
+    require_admin_permission,
+    require_permission,
+)
+from app.models.employee import Employee
 from app.schemas.role import (
     RoleCreate,
     RoleUpdate,
@@ -35,7 +40,10 @@ router = APIRouter(
 )
 def create_role_endpoint(
     role_data: RoleCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: Employee = Depends(
+        require_admin_permission("role:assign")
+    ),
 ):
     try:
         return create_role(db, role_data)
@@ -53,7 +61,8 @@ def create_role_endpoint(
     response_model=list[RoleResponse]
 )
 def get_all_roles_endpoint(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("role:read")),
 ):
     return get_all_roles(db)
 
@@ -65,7 +74,8 @@ def get_all_roles_endpoint(
 )
 def get_role_by_id_endpoint(
     role_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("role:read")),
 ):
     role = get_role_by_id(db, role_id)
 
@@ -86,7 +96,10 @@ def get_role_by_id_endpoint(
 def update_role_endpoint(
     role_id: int,
     role_data: RoleUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: Employee = Depends(
+        require_admin_permission("role:assign")
+    ),
 ):
     try:
         role = update_role(db, role_id, role_data)
@@ -113,7 +126,10 @@ def update_role_endpoint(
 )
 def delete_role_endpoint(
     role_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: Employee = Depends(
+        require_admin_permission("role:assign")
+    ),
 ):
     try:
         deleted = delete_role(db, role_id)

@@ -9,6 +9,11 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.authorization import (
+    require_employee_access,
+    require_permission,
+)
+from app.models.employee import Employee
 
 from app.schemas.employee_skill import (
     EmployeeSkillCreate,
@@ -40,7 +45,9 @@ router = APIRouter(
 def assign_skill_endpoint(
     employee_id: UUID,
     skill_data: EmployeeSkillCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:create")),
+    _authorized_employee: Employee = Depends(require_employee_access),
 ):
     try:
         return assign_skill(db, employee_id, skill_data)
@@ -65,7 +72,9 @@ def assign_skill_endpoint(
 )
 def get_employee_skills_endpoint(
     employee_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:read")),
+    _authorized_employee: Employee = Depends(require_employee_access),
 ):
     try:
         return get_employee_skills(db, employee_id)
@@ -85,7 +94,9 @@ def get_employee_skills_endpoint(
 def get_employee_skill_endpoint(
     employee_id: UUID,
     skill_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:read")),
+    _authorized_employee: Employee = Depends(require_employee_access),
 ):
     assignment = get_employee_skill(
         db,
@@ -111,7 +122,9 @@ def update_employee_skill_endpoint(
     employee_id: UUID,
     skill_id: int,
     skill_data: EmployeeSkillUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:update")),
+    _authorized_employee: Employee = Depends(require_employee_access),
 ):
     try:
         assignment = update_employee_skill(
@@ -144,7 +157,9 @@ def update_employee_skill_endpoint(
 def remove_employee_skill_endpoint(
     employee_id: UUID,
     skill_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(require_permission("skill:delete")),
+    _authorized_employee: Employee = Depends(require_employee_access),
 ):
     deleted = remove_employee_skill(
         db,

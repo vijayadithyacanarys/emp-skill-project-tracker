@@ -4,6 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.authorization import (
+    project_scope_filter,
+    require_permission,
+    require_project_access,
+)
+from app.models.employee import Employee
+from app.models.project import Project
 from app.schemas.project import ProjectResponse
 from app.schemas.project_required_skill import (
     ProjectRequiredSkillCreate,
@@ -30,7 +37,11 @@ router = APIRouter(tags=["Project Required Skills"])
 def add_required_skill_endpoint(
     project_id: UUID,
     requirement_data: ProjectRequiredSkillCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(
+        require_permission("project_skill:manage")
+    ),
+    _authorized_project: Project = Depends(require_project_access),
 ):
     try:
         return add_required_skill(db, project_id, requirement_data)
@@ -52,7 +63,11 @@ def add_required_skill_endpoint(
 )
 def get_project_required_skills_endpoint(
     project_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(
+        require_permission("project_skill:read")
+    ),
+    _authorized_project: Project = Depends(require_project_access),
 ):
     try:
         return get_project_required_skills(db, project_id)
@@ -71,7 +86,11 @@ def update_requirement_endpoint(
     project_id: UUID,
     skill_id: int,
     requirement_data: ProjectRequiredSkillUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(
+        require_permission("project_skill:manage")
+    ),
+    _authorized_project: Project = Depends(require_project_access),
 ):
     requirement = update_requirement(
         db,
@@ -96,7 +115,11 @@ def update_requirement_endpoint(
 def remove_requirement_endpoint(
     project_id: UUID,
     skill_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _actor: Employee = Depends(
+        require_permission("project_skill:manage")
+    ),
+    _authorized_project: Project = Depends(require_project_access),
 ):
     removed = remove_requirement(db, project_id, skill_id)
 
@@ -113,10 +136,17 @@ def remove_requirement_endpoint(
 )
 def get_projects_requiring_skill_endpoint(
     skill_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(
+        require_permission("project_skill:read")
+    ),
 ):
     try:
-        return get_projects_requiring_skill(db, skill_id)
+        return get_projects_requiring_skill(
+            db,
+            skill_id,
+            project_scope_filter(db, current_employee),
+        )
     except LookupError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

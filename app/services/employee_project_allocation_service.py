@@ -95,7 +95,7 @@ def validate_allocation_capacity(
 def create_allocation(
     db: Session,
     allocation: EmployeeProjectAllocationCreate,
-    admin_id: UUID
+    assigned_by: UUID
 ):
     try:
         # Lock the employee row to reduce concurrent over-allocation.
@@ -135,7 +135,7 @@ def create_allocation(
             employee_id=allocation.employee_id,
             project_id=allocation.project_id,
             allocation_percentage=allocation.allocation_percentage,
-            assigned_by=admin_id,
+            assigned_by=assigned_by,
             start_date=allocation.start_date,
             end_date=allocation.end_date
         )

@@ -18,8 +18,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.role import Role
     from app.models.employee import Employee
+    from app.models.employee_credential import EmployeeCredential
+    from app.models.employee_role import EmployeeRole
     from app.models.employee_skill import EmployeeSkill
     from app.models.employee_project_allocation import EmployeeProjectAllocation
+    from app.models.project_manager import ProjectManager
     from app.models.skill import Skill
 
 
@@ -75,6 +78,27 @@ class Employee(Base):
 
     role: Mapped["Role"] = relationship(
         back_populates="employees"
+    )
+
+    credential: Mapped["EmployeeCredential | None"] = relationship(
+        back_populates="employee",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
+
+    employee_role_assignments: Mapped[list["EmployeeRole"]] = relationship(
+        back_populates="employee",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="EmployeeRole.employee_id",
+    )
+
+    project_manager_assignments: Mapped[list["ProjectManager"]] = relationship(
+        back_populates="manager",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="ProjectManager.manager_id",
     )
 
     skills: Mapped[list["EmployeeSkill"]] = relationship(

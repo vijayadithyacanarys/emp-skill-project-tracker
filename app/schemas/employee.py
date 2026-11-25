@@ -26,8 +26,6 @@ class EmployeeResponse(BaseModel):
     employee_id: UUID
     name: str
     email: str
-    role_id: int
     experience_years: float
-    status: str
 
     model_config = ConfigDict(from_attributes=True)

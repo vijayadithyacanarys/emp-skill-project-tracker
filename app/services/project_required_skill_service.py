@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.project import Project
 from app.models.project_required_skill import ProjectRequiredSkill
@@ -97,7 +98,11 @@ def remove_requirement(db: Session, project_id: UUID, skill_id: int):
     return True
 
 
-def get_projects_requiring_skill(db: Session, skill_id: int):
+def get_projects_requiring_skill(
+    db: Session,
+    skill_id: int,
+    project_scope: ColumnElement[bool] | None = None,
+):
     if db.get(Skill, skill_id) is None:
         raise LookupError("Skill not found")
 
@@ -110,4 +115,6 @@ def get_projects_requiring_skill(db: Session, skill_id: int):
         .where(ProjectRequiredSkill.skill_id == skill_id)
         .order_by(Project.project_name)
     )
+    if project_scope is not None:
+        statement = statement.where(project_scope)
     return db.scalars(statement).all()

@@ -3,6 +3,9 @@ from fastapi import FastAPI
 app = FastAPI()
 
 
+from app.routes.auth import router as auth_router
+app.include_router(auth_router)
+
 from app.routes.role import router as role_router
 app.include_router(role_router)
 
