@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 import uuid
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -40,7 +40,7 @@ class ProjectRequiredSkill(Base):
         Boolean,
         nullable=False,
         default=True,
-        server_default="true"
+        server_default=true()
     )
 
     project: Mapped["Project"] = relationship(

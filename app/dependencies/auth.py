@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.employee import Employee
 from app.models.employee_credential import EmployeeCredential
 from app.utils.security import verify_access_token
+from app.utils.security import JWTConfigurationError
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -34,7 +35,13 @@ def get_current_employee(
         claims = verify_access_token(credentials.credentials)
         employee_id = UUID(claims["sub"])
         credential_version = UUID(claims["credential_version"])
-    except (PyJWTError, KeyError, TypeError, ValueError):
+    except (
+        PyJWTError,
+        JWTConfigurationError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
         raise _unauthorized() from None
 
     employee = db.get(Employee, employee_id)
@@ -50,12 +57,3 @@ def get_current_employee(
         raise _unauthorized()
 
     return employee
-
-
-def get_current_admin(
-    _employee: Employee = Depends(get_current_employee),
-) -> Employee:
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Admin authorization is unavailable until RBAC is implemented",
-    )

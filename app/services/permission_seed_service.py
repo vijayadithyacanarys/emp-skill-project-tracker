@@ -1,6 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.db_compat import exact_string_equal
 from app.models.permission import Permission
 from app.models.role import Role
 from app.models.role_permission import RolePermission
@@ -62,7 +63,14 @@ ROLE_PERMISSION_NAMES = {
 def seed_permission_catalogue(db: Session) -> tuple[int, int]:
     role_names = tuple(ROLE_PERMISSION_NAMES)
     roles = db.scalars(
-        select(Role).where(Role.role_name.in_(role_names))
+        select(Role).where(
+            or_(
+                *(
+                    exact_string_equal(Role.role_name, role_name)
+                    for role_name in role_names
+                )
+            )
+        )
     ).all()
     roles_by_name = {role.role_name: role for role in roles}
 

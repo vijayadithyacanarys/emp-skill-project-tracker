@@ -103,6 +103,11 @@ def create_allocation(
             select(Employee)
             .where(Employee.employee_id == allocation.employee_id)
             .with_for_update()
+            .with_hint(
+                Employee,
+                "WITH (UPDLOCK, ROWLOCK)",
+                dialect_name="mssql",
+            )
         )
 
         if not employee:
@@ -229,6 +234,11 @@ def update_allocation(
             select(Employee.employee_id)
             .where(Employee.employee_id == allocation.employee_id)
             .with_for_update()
+            .with_hint(
+                Employee,
+                "WITH (UPDLOCK, ROWLOCK)",
+                dialect_name="mssql",
+            )
         )
 
         update_data = allocation_data.model_dump(
@@ -302,6 +312,11 @@ def update_allocation_status(
             select(Employee.employee_id)
             .where(Employee.employee_id == allocation.employee_id)
             .with_for_update()
+            .with_hint(
+                Employee,
+                "WITH (UPDLOCK, ROWLOCK)",
+                dialect_name="mssql",
+            )
         )
 
         new_status = status_data.status
@@ -338,6 +353,11 @@ def cancel_allocation(
                 EmployeeProjectAllocation.allocation_id == allocation_id
             )
             .with_for_update()
+            .with_hint(
+                EmployeeProjectAllocation,
+                "WITH (UPDLOCK, ROWLOCK)",
+                dialect_name="mssql",
+            )
         )
 
         if not allocation:
@@ -380,6 +400,11 @@ def complete_allocation(
                 EmployeeProjectAllocation.allocation_id == allocation_id
             )
             .with_for_update()
+            .with_hint(
+                EmployeeProjectAllocation,
+                "WITH (UPDLOCK, ROWLOCK)",
+                dialect_name="mssql",
+            )
         )
 
         if not allocation:

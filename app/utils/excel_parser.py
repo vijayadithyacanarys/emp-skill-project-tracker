@@ -15,9 +15,21 @@ def read_excel_batches(file, batch_size=1000):
 
         coloumn = ['name','email','role_id','experience_years','status']
         batch = []
+        first_row = True
 
-        for row in rows:
+        for excel_row_number, row in enumerate(rows, start=1):
+            if first_row:
+                first_row = False
+                normalized = [
+                    str(value).strip().lower()
+                    if value is not None
+                    else ""
+                    for value in row
+                ]
+                if normalized[:len(coloumn)] == coloumn:
+                    continue
             record = dict(zip(coloumn,row))
+            record["_row_number"] = excel_row_number
             batch.append(record)
 
             if len(batch) == batch_size:

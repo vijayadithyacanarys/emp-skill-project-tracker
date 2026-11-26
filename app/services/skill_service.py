@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from app.db_compat import exact_string_equal
 from app.models.skill import Skill
 from app.schemas.skill import SkillCreate, SkillUpdate
 
@@ -11,7 +12,7 @@ def create_skill(db: Session, skill_data: SkillCreate):
 
     existing_skill = db.scalar(
         select(Skill).where(
-            Skill.skill_name == skill_data.skill_name
+            exact_string_equal(Skill.skill_name, skill_data.skill_name)
         )
     )
 
@@ -63,7 +64,7 @@ def update_skill(
 
     existing_skill = db.scalar(
         select(Skill).where(
-            Skill.skill_name == skill_data.skill_name,
+            exact_string_equal(Skill.skill_name, skill_data.skill_name),
             Skill.skill_id != skill_id
         )
     )

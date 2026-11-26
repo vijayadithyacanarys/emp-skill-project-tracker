@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.engine import make_url
 
 from alembic import context
 
@@ -15,9 +16,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+database_url = os.getenv("DATABASE_URL")
+if not database_url:
+    raise RuntimeError("DATABASE_URL must be set for PostgreSQL migrations")
+if make_url(database_url).get_backend_name() != "postgresql":
+    raise RuntimeError(
+        "PostgreSQL migrations require a PostgreSQL DATABASE_URL"
+    )
+
 config.set_main_option(
     "sqlalchemy.url",
-    os.getenv("DATABASE_URL").replace("%", "%%")
+    database_url.replace("%", "%%")
 )
 
 # Interpret the config file for Python logging.

@@ -1,18 +1,30 @@
 from datetime import datetime
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, String, Uuid, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.db_compat import (
+    ascii_string,
+    current_timestamp_expression,
+    unicode_string,
+)
 from app.models.employee import Employee
 
 
 class EmployeeCredential(Base):
     __tablename__ = "emp_credentials"
 
+    __table_args__ = (
+        CheckConstraint(
+            "DATALENGTH(emp_email) = DATALENGTH(RTRIM(emp_email))",
+            name="check_emp_credentials_email_no_trailing_spaces",
+        ).ddl_if(dialect="mssql"),
+    )
+
     emp_email: Mapped[str] = mapped_column(
-        String(150),
+        unicode_string(150),
         ForeignKey(
             "employees.email",
             ondelete="CASCADE",
@@ -22,7 +34,7 @@ class EmployeeCredential(Base):
     )
 
     password_hash: Mapped[str] = mapped_column(
-        String(255),
+        ascii_string(255),
         nullable=False,
     )
 
@@ -35,14 +47,14 @@ class EmployeeCredential(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
+        server_default=current_timestamp_expression(),
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
+        server_default=current_timestamp_expression(),
+        onupdate=current_timestamp_expression(),
     )
 
     employee: Mapped[Employee] = relationship(

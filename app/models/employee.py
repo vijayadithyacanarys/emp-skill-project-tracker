@@ -2,7 +2,6 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy import (
-    String,
     Integer,
     Numeric,
     ForeignKey,
@@ -12,6 +11,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.db_compat import exact_string_in, unicode_string
 
 from typing import TYPE_CHECKING
 
@@ -35,9 +35,13 @@ class Employee(Base):
             name="check_experience_nonnegative"
         ),
         CheckConstraint(
-            "status IN ('active', 'inactive')",
+            exact_string_in("status", ("active", "inactive")),
             name="check_employee_status"
         ),
+        CheckConstraint(
+            "DATALENGTH(email) = DATALENGTH(RTRIM(email))",
+            name="check_employee_email_no_trailing_spaces",
+        ).ddl_if(dialect="mssql"),
     )
 
     employee_id: Mapped[uuid.UUID] = mapped_column(
@@ -47,12 +51,12 @@ class Employee(Base):
     )
 
     name: Mapped[str] = mapped_column(
-        String(100),
+        unicode_string(100),
         nullable=False
     )
 
     email: Mapped[str] = mapped_column(
-        String(150),
+        unicode_string(150),
         unique=True,
         nullable=False
     )
@@ -69,7 +73,7 @@ class Employee(Base):
     )
 
     status: Mapped[str] = mapped_column(
-        String(20),
+        unicode_string(20),
         nullable=False,
         default="active",
         server_default="active"

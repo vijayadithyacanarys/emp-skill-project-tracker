@@ -4,21 +4,28 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.db_compat import validate_email_whitespace
 from app.models.employee import Employee
 from app.models.employee_credential import EmployeeCredential
 from app.utils.security import hashed_password, verify_password
 
 
-_DUMMY_PASSWORD_HASH = hashed_password("not-a-valid-employee-password")
+_DUMMY_PASSWORD_HASH = hashed_password("Not-a-Valid-Employee-p@ssword")
 
 
 def create_employee_credential(
     db: Session,
     employee_email: str,
     password: str,
+    commit: bool = True,
 ) -> None:
     if not password:
         raise ValueError("Password must not be empty")
+
+    validate_email_whitespace(
+        employee_email,
+        db.get_bind().dialect.name,
+    )
 
     employee = db.scalar(
         select(Employee).where(Employee.email == employee_email)
@@ -37,15 +44,18 @@ def create_employee_credential(
     )
     db.add(credential)
 
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        if db.get(EmployeeCredential, stored_email) is not None:
-            raise ValueError(
-                "Credentials already exist for this employee"
-            ) from None
-        raise
+    if commit:
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            if db.get(EmployeeCredential, stored_email) is not None:
+                raise ValueError(
+                    "Credentials already exist for this employee"
+                ) from None
+            raise
+    else:
+        db.flush()
 
 
 def authenticate_employee(
@@ -53,6 +63,11 @@ def authenticate_employee(
     employee_email: str,
     password: str,
 ) -> tuple[Employee, uuid.UUID] | None:
+    validate_email_whitespace(
+        employee_email,
+        db.get_bind().dialect.name,
+    )
+
     credential = db.get(EmployeeCredential, employee_email)
     if credential is None:
         verify_password(password, _DUMMY_PASSWORD_HASH)
@@ -66,3 +81,32 @@ def authenticate_employee(
         return None
 
     return employee, credential.credential_version
+
+
+def rotate_employee_credential(
+    db: Session,
+    employee_email: str,
+    password: str,
+) -> EmployeeCredential:
+    if not password:
+        raise ValueError("Password must not be empty")
+
+    validate_email_whitespace(
+        employee_email,
+        db.get_bind().dialect.name,
+    )
+
+    credential = db.get(EmployeeCredential, employee_email)
+    if credential is None:
+        raise LookupError("Employee credentials not found")
+
+    credential.password_hash = hashed_password(password)
+    credential.credential_version = uuid.uuid4()
+
+    try:
+        db.commit()
+        db.refresh(credential)
+        return credential
+    except IntegrityError:
+        db.rollback()
+        raise

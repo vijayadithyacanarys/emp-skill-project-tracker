@@ -2,10 +2,11 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, Date, String, Text, Uuid
+from sqlalchemy import CheckConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.db_compat import date_type, unicode_string, unicode_text
 
 if TYPE_CHECKING:
     from app.models.employee_project_allocation import EmployeeProjectAllocation
@@ -30,27 +31,27 @@ class Project(Base):
     )
 
     project_name: Mapped[str] = mapped_column(
-        String(200),
+        unicode_string(200),
         nullable=False
     )
 
     description: Mapped[str | None] = mapped_column(
-        Text,
+        unicode_text(),
         nullable=True
     )
 
     start_date: Mapped[date | None] = mapped_column(
-        Date,
+        date_type(),
         nullable=True
     )
 
     end_date: Mapped[date | None] = mapped_column(
-        Date,
+        date_type(),
         nullable=True
     )
 
     status: Mapped[str] = mapped_column(
-        String(30),
+        unicode_string(30),
         nullable=False
     )
 

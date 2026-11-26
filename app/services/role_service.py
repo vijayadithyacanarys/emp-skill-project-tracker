@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from app.db_compat import exact_string_equal
 from app.models.role import Role
 from app.schemas.role import RoleCreate, RoleUpdate
 
@@ -10,7 +11,7 @@ from app.schemas.role import RoleCreate, RoleUpdate
 def create_role(db: Session, role_data: RoleCreate):
     existing_role = db.scalar(
         select(Role).where(
-            Role.role_name == role_data.role_name
+            exact_string_equal(Role.role_name, role_data.role_name)
         )
     )
 
@@ -54,7 +55,7 @@ def update_role(
 
     existing_role = db.scalar(
         select(Role).where(
-            Role.role_name == role_data.role_name,
+            exact_string_equal(Role.role_name, role_data.role_name),
             Role.role_id != role_id
         )
     )

@@ -5,15 +5,14 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     CheckConstraint,
-    Date,
     ForeignKey,
     Numeric,
-    String,
     Uuid
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.db_compat import date_type, exact_string_in, unicode_string
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
@@ -33,7 +32,10 @@ class EmployeeProjectAllocation(Base):
             name="check_allocation_date_range"
         ),
         CheckConstraint(
-            "status IN ('planned', 'active', 'completed', 'cancelled')",
+            exact_string_in(
+                "status",
+                ("planned", "active", "completed", "cancelled"),
+            ),
             name="check_allocation_status"
         ),
     )
@@ -65,18 +67,18 @@ class EmployeeProjectAllocation(Base):
     )
 
     status: Mapped[str] = mapped_column(
-        String(30),
+        unicode_string(30),
         nullable=False,
         server_default = "planned"
     )
 
     start_date: Mapped[date] = mapped_column(
-        Date,
+        date_type(),
         nullable=False
     )
 
     end_date: Mapped[date] = mapped_column(
-        Date,
+        date_type(),
         nullable=False
     )
 

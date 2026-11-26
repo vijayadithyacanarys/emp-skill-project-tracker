@@ -1,5 +1,4 @@
 from uuid import UUID
-import traceback
 
 from fastapi import (
     APIRouter,
@@ -10,7 +9,9 @@ from fastapi import (
     UploadFile
 )
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from zipfile import BadZipFile
 
 from app.database import get_db
 from app.dependencies.authorization import (
@@ -58,31 +59,36 @@ def upload_employees(
     total_inserted = 0
 
     try:
-
-        for batch in read_excel_batches(file.file):
-
-            bulk_insert_employees(db, batch)
-
-            total_inserted += len(batch)
+        if db.in_transaction():
+            db.rollback()
+        with db.begin():
+            for batch in read_excel_batches(file.file):
+                bulk_insert_employees(db, batch)
+                total_inserted += len(batch)
 
         return {
             "message": "Employees imported successfully",
             "total_inserted": total_inserted
         }
 
-    except Exception as e:
-
+    except (ValueError, LookupError, BadZipFile) as error:
         db.rollback()
-
-        print("ERROR TYPE:", type(e).__name__)
-        print("ERROR:", repr(e))
-
-        if hasattr(e, "orig"):
-            print("DATABASE ERROR:", repr(e.orig))
-
-        traceback.print_exc()
-
-        raise
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Employee import contains conflicting records",
+        )
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to import employees",
+        )
 
 
 
@@ -333,6 +339,11 @@ def remove_employee_role_endpoint(
     except LookupError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         ) from error
 

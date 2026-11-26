@@ -6,7 +6,7 @@ from app.services.auth_service import create_employee_credential
 
 
 def main() -> int:
-    employee_email = input("Existing employee email: ").strip()
+    employee_email = input("Existing employee email: ")
     password = getpass("Password: ")
     confirmation = getpass("Confirm password: ")
 
@@ -19,6 +19,8 @@ def main() -> int:
 
     with SessionLocal() as db:
         try:
+            if db.get_bind().dialect.name != "mssql":
+                employee_email = employee_email.strip()
             create_employee_credential(db, employee_email, password)
         except (LookupError, ValueError) as error:
             print(str(error), file=sys.stderr)

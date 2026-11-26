@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.auth import AccessTokenResponse, LoginRequest
 from app.services.auth_service import authenticate_employee
-from app.utils.security import create_access_token
+from app.utils.security import JWTConfigurationError, create_access_token
 
 
 router = APIRouter(
@@ -34,9 +34,15 @@ def login(
         )
 
     employee, credential_version = authenticated_employee
-    return AccessTokenResponse(
-        access_token=create_access_token(
+    try:
+        access_token = create_access_token(
             employee.employee_id,
             credential_version,
         )
-    )
+    except JWTConfigurationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication is not configured",
+        ) from error
+
+    return AccessTokenResponse(access_token=access_token)

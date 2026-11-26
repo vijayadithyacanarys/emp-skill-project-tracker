@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.db_compat import exact_string_equal
 from app.models.employee import Employee
 from app.models.employee_role import EmployeeRole
 from app.models.project import Project
@@ -28,7 +29,24 @@ def assign_employee_role(
         raise ValueError("Role is already assigned to employee")
 
     try:
+        employee = db.get(Employee, employee_id)
+        existing_assignments = db.scalars(
+            select(EmployeeRole.role_id).where(
+                EmployeeRole.employee_id == employee_id
+            )
+        ).all()
+
         db.add(EmployeeRole(employee_id=employee_id, role_id=role_id))
+        db.flush()
+        resulting_role_ids = db.scalars(
+            select(EmployeeRole.role_id).where(
+                EmployeeRole.employee_id == employee_id
+            )
+        ).all()
+        if employee.role_id not in resulting_role_ids:
+            employee.role_id = min(resulting_role_ids)
+        elif not existing_assignments:
+            employee.role_id = role_id
         db.commit()
         return role
     except IntegrityError as error:
@@ -51,9 +69,32 @@ def remove_employee_role(
     if assignment is None:
         return False
 
-    db.delete(assignment)
-    db.commit()
-    return True
+    remaining_role_ids = db.scalars(
+        select(EmployeeRole.role_id).where(
+            EmployeeRole.employee_id == employee_id,
+            EmployeeRole.role_id != role_id,
+        )
+    ).all()
+    if not remaining_role_ids:
+        raise ValueError(
+            "Employee must retain at least one role"
+        )
+
+    try:
+        db.delete(assignment)
+        db.flush()
+        employee = db.get(Employee, employee_id)
+        if employee.role_id == role_id:
+            employee.role_id = min(remaining_role_ids)
+        elif employee.role_id not in remaining_role_ids:
+            employee.role_id = min(remaining_role_ids)
+        db.commit()
+        return True
+    except IntegrityError as error:
+        db.rollback()
+        raise RuntimeError(
+            "Unable to remove employee role because of conflicting data"
+        ) from error
 
 
 def get_employee_roles(db: Session, employee_id: UUID) -> list[Role]:
@@ -85,7 +126,7 @@ def assign_project_manager(
         .join(Role, Role.role_id == EmployeeRole.role_id)
         .where(
             EmployeeRole.employee_id == manager_id,
-            Role.role_name == "Manager",
+            exact_string_equal(Role.role_name, "Manager"),
         )
         .limit(1)
     )
