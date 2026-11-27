@@ -37,7 +37,6 @@ class Role(Base):
         unicode_string(50),
         nullable=False
     )
-
     if engine.dialect.name == "mssql":
         role_name_binary_key: Mapped[bytes | None] = mapped_column(
             mssql.VARBINARY(length=100),
@@ -54,9 +53,6 @@ class Role(Base):
             nullable=True,
         )
 
-    employees: Mapped[list["Employee"]] = relationship(
-        back_populates="role"
-    )
 
     employee_role_assignments: Mapped[list["EmployeeRole"]] = relationship(
         back_populates="role",

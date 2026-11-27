@@ -10,3 +10,8 @@ from app.models.permission import Permission
 from app.models.employee_role import EmployeeRole
 from app.models.role_permission import RolePermission
 from app.models.project_manager import ProjectManager
+from app.models.module import Module
+from app.models.assignment import Assignment
+from app.models.assignment_question import AssignmentQuestion
+from app.models.question_choice import QuestionChoice
+from app.models.employee_assignment import EmployeeAssignment

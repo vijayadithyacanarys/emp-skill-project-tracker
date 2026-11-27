@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.employee_skill import EmployeeSkill
     from app.models.project_required_skill import ProjectRequiredSkill
     from app.models.skill import Skill
+    from app.models.module import Module
 
 
 
@@ -69,3 +70,8 @@ class Skill(Base):
     required_projects: Mapped[list["ProjectRequiredSkill"]] = relationship(
         back_populates="skill"
     )
+
+    module: Mapped["Module | None"] = relationship(
+    back_populates="skill",
+    uselist=False
+)

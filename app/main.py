@@ -29,6 +29,12 @@ from app.routes.employee_project_allocation import (
 )
 app.include_router(employee_project_allocation_router)
 
+from app.routes.module import router as module_router
+app.include_router(module_router)
+
+from app.routes.assignment import router as assignment_router
+app.include_router(assignment_router)
+
 
 @app.get("/")
 def home():

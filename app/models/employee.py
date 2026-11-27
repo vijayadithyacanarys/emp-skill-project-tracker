@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from app.models.employee_project_allocation import EmployeeProjectAllocation
     from app.models.project_manager import ProjectManager
     from app.models.skill import Skill
+    from app.models.employee_assignment import EmployeeAssignment
 
 
 class Employee(Base):
@@ -61,11 +62,6 @@ class Employee(Base):
         nullable=False
     )
 
-    role_id: Mapped[int] = mapped_column(
-        ForeignKey("roles.role_id"),
-        nullable=False
-    )
-
     experience_years: Mapped[Decimal] = mapped_column(
         Numeric(4, 1),
         nullable=False,
@@ -80,9 +76,6 @@ class Employee(Base):
     )
     
 
-    role: Mapped["Role"] = relationship(
-        back_populates="employees"
-    )
 
     credential: Mapped["EmployeeCredential | None"] = relationship(
         back_populates="employee",
@@ -118,4 +111,14 @@ class Employee(Base):
     assigned_project_allocations: Mapped[list["EmployeeProjectAllocation"]] = relationship(
         back_populates="assigner",
         foreign_keys="EmployeeProjectAllocation.assigned_by"
+    )
+
+    employee_assignments: Mapped[list["EmployeeAssignment"]] = relationship(
+        back_populates="employee",
+        foreign_keys="EmployeeAssignment.employee_id",
+    )
+
+    assigned_employee_assignments: Mapped[list["EmployeeAssignment"]] = relationship(
+        back_populates="assigner",
+        foreign_keys="EmployeeAssignment.assigned_by",
     )
